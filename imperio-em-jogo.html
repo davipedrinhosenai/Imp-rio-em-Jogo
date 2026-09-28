@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Império em Jogo</title>
+<link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700;900&family=Old+Standard+TT:ital@0;1&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#efe4c8; --paper-dark:#e3d3a8; --ink:#2b2013; --ink-soft:#4a3c24;
+  --wood:#5c3a21; --wood-dark:#3a2414; --gold:#a3792f; --crimson:#7a2d1f;
+  --line:#c9b284;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+html{scroll-padding-top:env(safe-area-inset-top,0px);}
+body{
+  background: radial-gradient(ellipse at top, #6b4423, var(--wood-dark));
+  color:var(--ink); font-family:'Old Standard TT',Georgia,serif;
+  min-height:100vh; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+  display:flex; justify-content:center;
+}
+.frame{width:100%; max-width:880px; padding:28px 16px 56px;}
+.masthead{text-align:center; color:#e9dcb8; margin-bottom:18px;}
+.masthead h1{font-family:'Merriweather',serif; font-weight:900; font-size:clamp(28px,5vw,44px); margin:0; letter-spacing:.5px;}
+.masthead p{margin:6px 0 0; font-style:italic; color:#c9b284; font-size:15px;}
+
+.vars{display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin:0 0 20px;}
+.var-chip{
+  border:1px solid var(--wood); border-radius:2px; padding:5px 10px; font-size:12.5px;
+  background:var(--paper-dark); color:var(--ink-soft); transition:all .25s ease;
+}
+.var-chip.active{background:var(--crimson); color:#f3e6c9; border-color:var(--crimson); font-weight:700;}
+
+.paper{
+  background: var(--paper);
+  background-image: repeating-linear-gradient(rgba(92,58,33,.035) 0 1px, transparent 1px 3px);
+  border:1px solid var(--wood); box-shadow: 0 18px 40px rgba(0,0,0,.45), inset 0 0 60px rgba(92,58,33,.12);
+  border-radius:3px; padding:clamp(20px,4vw,44px); position:relative;
+}
+.paper::before{content:"";position:absolute;inset:8px;border:1px solid var(--line);pointer-events:none;}
+.stage-tag{font-size:12px; letter-spacing:.08em; color:var(--gold); margin-bottom:6px;}
+.year-tag{font-size:14px; color:var(--ink-soft); font-style:italic; margin-bottom:16px;}
+.char-badge{
+  display:inline-block; margin-bottom:14px; font-size:13px; padding:3px 10px;
+  border:1px solid var(--crimson); color:var(--crimson); border-radius:2px;
+}
+.story-text{font-size:19px; line-height:1.75; color:var(--ink); white-space:pre-line; margin-bottom:26px;}
+.story-text:first-letter{font-family:'Merriweather',serif; font-weight:900; font-size:46px; float:left; line-height:.8; margin:6px 8px 0 0; color:var(--crimson);}
+
+.choices{display:flex; flex-direction:column; gap:12px;}
+.choice-btn{
+  text-align:left; background:transparent; border:1.5px solid var(--wood); color:var(--ink);
+  font-family:inherit; font-size:16px; padding:14px 18px; border-radius:2px; cursor:pointer;
+  transition:background .2s, transform .1s; line-height:1.5;
+}
+.choice-btn:hover{background:rgba(122,45,31,.08); transform:translateX(3px);}
+.choice-btn:focus-visible{outline:2px solid var(--crimson); outline-offset:2px;}
+.choice-btn b{color:var(--crimson);}
+
+.charpick{display:grid; gap:14px; grid-template-columns:1fr; }
+@media(min-width:640px){.charpick{grid-template-columns:1fr 1fr 1fr;}}
+.char-card{border:1.5px solid var(--wood); padding:16px; border-radius:2px; cursor:pointer; background:rgba(255,255,255,.15); transition:transform .15s, background .2s;}
+.char-card:hover{transform:translateY(-3px); background:rgba(255,255,255,.35);}
+.char-card h3{margin:0 0 6px; font-family:'Merriweather',serif; font-size:18px; color:var(--crimson);}
+.char-card p{margin:0; font-size:14.5px; line-height:1.5;}
+
+.final-title{font-family:'Merriweather',serif; font-size:24px; color:var(--crimson); margin-bottom:14px;}
+.reflection label{display:block; font-weight:700; margin:18px 0 6px; font-size:15px;}
+.reflection textarea{
+  width:100%; min-height:90px; font-family:inherit; font-size:15px; padding:10px;
+  border:1px solid var(--wood); background:#f7efd8; border-radius:2px; resize:vertical;
+}
+.actions{display:flex; gap:12px; flex-wrap:wrap; margin-top:24px;}
+.btn{border:1.5px solid var(--wood); background:var(--wood); color:#f3e6c9; padding:10px 18px; border-radius:2px; font-family:inherit; font-size:15px; cursor:pointer;}
+.btn.secondary{background:transparent; color:var(--wood);}
+.progress{font-size:12px; text-align:center; color:#c9b284; margin-top:16px;}
+</style>
+</head>
+<body>
+<div class="frame">
+  <div class="masthead">
+    <h1>Império em Jogo</h1>
+    <p>Uma ficção interativa sobre o Brasil Imperial e a Primeira República</p>
+  </div>
+  <div class="vars" id="vars"></div>
+  <div class="paper" id="paper"></div>
+  <div class="progress" id="progress"></div>
+</div>
+
+<script>
+const VARS = ["Posição Social","Região","Instituições","Relações de Poder","Resistência"];
+
+const NODES = {
+  n1:{stage:"Etapa 1 · Seleção de Personagem", year:"1835 — Período Regencial", vars:["Posição Social","Região"],
+    text:"Brasil, 1835. O país vive a ebulição do Período Regencial. Sem um Imperador coroado, revoltas pipocam pelas províncias e o poder real é disputado entre velhas oligarquias, coronéis e a população marginalizada. Quem é você nesse império em construção?",
+    isCharPick:true,
+    choices:[
+      {label:"Maria de Jesus", desc:"Filha de pequenos proprietários rurais no interior da Bahia. Busca autonomia em uma sociedade patriarcal.", to:"n2A", char:"Maria de Jesus — Bahia"},
+      {label:"Guilherme de Albuquerque", desc:"Filho de um barão de café do Vale do Paraíba (RJ). Herdeiro do patrimonialismo e das redes de favor da elite.", to:"n2B", char:"Guilherme de Albuquerque — Rio de Janeiro"},
+      {label:"Francisco \"Nego\" Caetité", desc:"Homem negro escravizado nascido em Pernambuco, articulado com redes urbanas de resistência no Recife.", to:"n2C", char:"Francisco Caetité — Pernambuco"},
+    ]},
+  n2A:{stage:"Etapa 2 · O Primeiro Grande Conflito", year:"1838 — Revolta da Sabinada (Bahia)", vars:["Posição Social","Instituições"],
+    text:"A Revolta da Sabinada explode na Bahia. Seu pai quer arranjar seu casamento com um velho comerciante local para \"proteger a família\", mas simpatizantes rebeldes passam pela sua fazenda pedindo abrigo.",
+    choices:[
+      {label:"Aceitar o casamento e buscar influência nos bastidores da família patriarcal.", to:"n3A"},
+      {label:"Fugir na calada da noite e se juntar ao apoio e suprimento dos rebeldes baianos.", to:"n3B"},
+    ]},
+  n2B:{stage:"Etapa 2 · O Primeiro Grande Conflito", year:"1838 — Largo de São Francisco (SP)", vars:["Relações de Poder","Instituições"],
+    text:"Seu pai exige que você vá para a Faculdade de Direito do Largo de São Francisco, para garantir contatos com a burocracia do Estado Imperial. Você descobre que um juiz amigo da família cometeu fraudes para tomar as terras de um pequeno lavrador vizinho.",
+    choices:[
+      {label:"Usar o prestígio da família para abafar o caso, garantindo favores futuros do Judiciário (patrimonialismo).", to:"n3A"},
+      {label:"Denunciar a fraude, confrontando a lógica de apadrinhamento da própria classe.", to:"n3B"},
+    ]},
+  n2C:{stage:"Etapa 2 · O Primeiro Grande Conflito", year:"1838 — Recife (PE)", vars:["Posição Social","Resistência"],
+    text:"Circulam boatos sobre insurreições no Nordeste. Você guarda dinheiro para tentar comprar sua Carta de Alforria, mas seu senhor decide vendê-lo para cobrir dívidas de engenho com comerciantes do Recife, ameaçando separá-lo de seus aliados.",
+    choices:[
+      {label:"Negociar com o senhor pela mediação de um padre local e da Igreja (paternalismo).", to:"n3B"},
+      {label:"Escapar antes da venda e se refugiar em um quilombo urbano nas cercanias do Recife.", to:"n3C"},
+    ]},
+  n3A:{stage:"Etapa 3 · Ascensão das Elites e Conflitos de Classe", year:"Década de 1850", vars:["Região","Relações de Poder"],
+    text:"A Lei Eusébio de Queirós proíbe o tráfico transatlântico e a Lei de Terras transforma a terra em propriedade privada cara. Você está bem posicionado no Sudeste, mas precisa consolidar capital econômico e político.",
+    choices:[
+      {label:"Investir na compra de terras públicas antes que camponeses e libertos tenham acesso legal a elas.", to:"n4A"},
+      {label:"Financiar a vinda de imigrantes europeus para substituir a mão de obra no sistema de parceria.", to:"n4B"},
+    ]},
+  n3B:{stage:"Etapa 3 · Ascensão das Elites e Conflitos de Classe", year:"Década de 1850 — Rio de Janeiro", vars:["Instituições","Relações de Poder"],
+    text:"Você vive no centro urbano do Rio de Janeiro. A modernização do Império avança, mas as instituições continuam controladas por apadrinhamento político. Para prosperar ou garantir proteção, você precisa de favores.",
+    choices:[
+      {label:"Ceder à lógica patronal, prestando lealdade a um político liberal em troca de proteção institucional.", to:"n4B"},
+      {label:"Organizar uma associação de mútua ajuda entre trabalhadores e mulheres locais, fora da tutela do Estado.", to:"n4C"},
+    ]},
+  n3C:{stage:"Etapa 3 · Ascensão das Elites e Conflitos de Classe", year:"Década de 1850 — Quilombos de Pernambuco", vars:["Resistência","Posição Social"],
+    text:"Nas redes de quilombos e mocambos, a repressão da Guarda Nacional é implacável. O Estado Imperial trata a população negra livre ou fugida estritamente como caso de polícia e ameaça à ordem pública.",
+    choices:[
+      {label:"Migrar clandestinamente para o Sudeste, infiltrando-se nas redes de libertos da capital.", to:"n4C"},
+      {label:"Ficar e pegar em armas para defender a comunidade autônoma contra os capitães do mato.", to:"n4A"},
+    ]},
+  n4A:{stage:"Etapa 4 · A Prova de Fogo — Guerra do Paraguai", year:"1865", vars:["Instituições","Resistência"],
+    text:"A Guerra do Paraguai exige um contingente brutal. O governo decreta o recrutamento dos \"Voluntários da Pátria\", prometendo alforria aos escravizados e títulos aos proprietários.",
+    choices:[
+      {label:"Usar recursos ou conexões para pagar um substituto pobre ou escravizado para ir à guerra em seu lugar.", to:"n5A"},
+      {label:"Ir para a guerra — no comando de tropas ou como soldado — vivenciando o horror do front.", to:"n5B"},
+    ]},
+  n4B:{stage:"Etapa 4 · A Burocracia da Guerra", year:"1865 — Rio de Janeiro", vars:["Relações de Poder","Instituições"],
+    text:"No Rio de Janeiro, a guerra movimenta negócios milionários de suprimentos e fardamentos. O governo recompensa cidadãos leais com prestígio e comendas.",
+    choices:[
+      {label:"Lucrar com o fornecimento de alimentos e suprimentos precários às tropas brasileiras no sul.", to:"n5A"},
+      {label:"Denunciar esquemas de corrupção nos contratos de fardamento das tropas.", to:"n5B"},
+    ]},
+  n4C:{stage:"Etapa 4 · Os Invisíveis da Guerra", year:"1865", vars:["Posição Social","Resistência"],
+    text:"Homens negros e mulheres são convocados para a retaguarda como enfermeiros, cozinheiros ou recrutas, sob promessa não garantida de cidadania no pós-guerra.",
+    choices:[
+      {label:"Aceitar servir ao Exército sob a promessa oficial de liberdade e direitos civis ao fim do conflito.", to:"n5B"},
+      {label:"Aproveitar o caos da mobilização militar para articular rotas de fuga e redes de emancipação.", to:"n5A"},
+    ]},
+  n5A:{stage:"Etapa 5 · A Crise do Império e o Abolicionismo", year:"Anos 1880 — A Defesa do Status Quo", vars:["Relações de Poder","Posição Social"],
+    text:"O movimento abolicionista ganha as ruas com panfletos, ações judiciais de advogados negros e ações radicais de libertação. A elite cafeeira tenta adiar a abolição total a todo custo.",
+    choices:[
+      {label:"Defender indenização financeira aos proprietários caso os escravizados sejam libertados pelo Estado.", to:"n6A"},
+      {label:"Financiar secretamente jornais e advogados abolicionistas pelo fim imediato da escravidão.", to:"n6B"},
+    ]},
+  n5B:{stage:"Etapa 5 · A Luta nas Ruas", year:"Anos 1880", vars:["Resistência","Instituições"],
+    text:"A pressão popular explode nas cidades. Soldados se recusam a perseguir escravizados fugidos. Redes de apoio organizam fundos para comprar alforrias e garantir rotas de fuga.",
+    choices:[
+      {label:"Participar diretamente das rotas clandestinas de fuga para o Quilombo do Jabaquara, em Santos.", to:"n6B"},
+      {label:"Tentar a via institucional: pressionar parlamentares a votarem leis abolicionistas no Senado.", to:"n6A"},
+    ]},
+  n6A:{stage:"Etapa 6 · O Golpe da República", year:"15 de novembro de 1889", vars:["Instituições","Relações de Poder"],
+    text:"Deodoro da Fonseca declara o fim da Monarquia. O povo assiste a tudo sem participação direta, enquanto a elite reacomoda suas forças.",
+    choices:[
+      {label:"Apoiar o novo regime republicano oligárquico, garantindo a continuidade do domínio dos grandes proprietários.", to:"n7A"},
+      {label:"Criticar a República Oligárquica, exigindo sufrágio universal — voto amplo para mulheres e analfabetos.", to:"n7B"},
+    ]},
+  n6B:{stage:"Etapa 6 · A República da Exclusão", year:"1889", vars:["Resistência","Posição Social"],
+    text:"A Lei Áurea assinou a liberdade em 1888, mas a República de 1889 não distribuiu terras nem garantiu cidadania, criminalizando costumes e a população marginalizada.",
+    choices:[
+      {label:"Organizar os primeiros sindicatos e associações de socorro mútuo de trabalhadores urbanos.", to:"n7B"},
+      {label:"Buscar abrigo e autonomia comunitária em movimentos populares e messiânicos no interior do país.", to:"n7A"},
+    ]},
+  n7A:{stage:"Etapa 7 · Consolidação da República Velha", year:"Anos 1890–1900 — O Coronelismo", vars:["Instituições","Relações de Poder"],
+    text:"Décadas se passaram desde o início da sua jornada. A política brasileira é dominada pela \"Política dos Governadores\". Oligarquias locais usam fraudes eleitorais, apadrinhamento e violência para controlar as urnas.",
+    choices:[
+      {label:"Submeter-se às regras do coronelismo para garantir a sobrevivência da sua comunidade.", to:"final1"},
+      {label:"Denunciar as fraudes eleitorais e abusos de poder através da imprensa independente.", to:"final2"},
+    ]},
+  n7B:{stage:"Etapa 7 · Consolidação da República Velha", year:"Anos 1890–1900 — Higienização Urbana", vars:["Resistência","Região"],
+    text:"O Estado moderniza suas cidades promovendo despejos e reformas urbanas higienistas que empurram os mais pobres para periferias e morros, gerando intensas revoltas populares.",
+    choices:[
+      {label:"Lutar nas ruas contra os abusos autoritários do Estado e o despejo forçado.", to:"final2"},
+      {label:"Tentar uma cartada nas altas instâncias da justiça para alterar a estrutura de privilégios da Constituição.", to:"final3"},
+    ]},
+  final1:{stage:"Etapa 8 · Desfecho", year:"Final 1", vars:[], final:true,
+    title:"🏆 O Brasil do Apadrinhamento e da Permanência",
+    text:"Você sobreviveu às profundas transformações do século XIX integrando-se — por estratégia ou necessidade — às estruturas oficiais do poder. A Monarquia deu lugar à República, mas as lógicas de poder permaneceram quase intocadas: o patrimonialismo continuou estruturando o Estado a serviço das oligarquias; o racismo estrutural foi maquiado pela negação da desigualdade; e a terra permaneceu concentrada. Você garantiu sua estabilidade individual, mas inserido em um sistema construído sobre a exclusão da maioria."},
+  final2:{stage:"Etapa 8 · Desfecho", year:"Final 2", vars:[], final:true,
+    title:"✊ A Semente da Resistência e das Lutas Sociais",
+    text:"Sua trajetória foi definida pelo confronto, pela margem e pela recusa ativa em aceitar as imposições de gênero, raça ou classe. Você enfrentou a violência policial da Primeira República e os privilégios do Império. Embora não tenha acumulado fortunas nem cargos de prestígio, sua trajetória ajudou a pavimentar os caminhos das associações comunitárias, dos movimentos de resistência e da busca por cidadania real que marcariam as lutas sociais brasileiras ao longo do século XX."},
+  final3:{stage:"Etapa 8 · Desfecho", year:"Final 3 — Reviravolta", vars:[], final:true,
+    title:"🌀 O Ciclo Infinito da Nobreza",
+    text:"Anos após a Proclamação, ao acessar arquivos sigilosos do Palácio do Catete, você descobre uma rede de registros mantida em segredo desde 1822: a transição do Império para a República foi inteiramente arranjada pelas elites para manter os mesmos grupos no controle econômico e político do país. Mais surpreendente: devido a trocas ocultas de certidões, Francisco Caetité era herdeiro legal de uma imensa propriedade confiscada, Guilherme descendia biologicamente de camponeses sem terra, e Maria de Jesus fora a autora anônima dos principais projetos de lei social vetados pelo Senado. A estrutura de privilégios não dependia do mérito, mas de um sistema burocrático e patrimonial desenhado para manter os mesmos grupos no topo, independentemente do regime político vigente."},
+};
+
+const REFLECTION_Q = [
+  "Instituições e Relações de Poder: qual característica do Brasil Imperial (ex: patrimonialismo, paternalismo, racismo estrutural, patriarcalismo) ficou mais evidente na trajetória percorrida pelo seu personagem?",
+  "Transformação e Permanência: ao analisar o desfecho do jogo, qual permanência histórica importante você consegue identificar entre o Brasil do século XIX e a sociedade brasileira contemporânea?",
+  "Agentes Socializadores e Identidade: de que maneira a posição social, o gênero ou a raça/etnia do personagem influenciaram ou limitaram as escolhas e caminhos disponíveis para ele ao longo da história?",
+];
+
+let state = {node:"n1", char:null, final:null, answers:["","",""]};
+
+function esc(t){
+  return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+function renderVars(active){
+  const el = document.getElementById("vars");
+  el.innerHTML = VARS.map(v=>`<span class="var-chip ${active.includes(v)?"active":""}">${v}</span>`).join("");
+}
+
+function choose(to, char){
+  if(char) state.char = char;
+  if(NODES[to] && NODES[to].final) state.final = to;
+  state.node = to;
+  render();
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+
+function render(){
+  const paper = document.getElementById("paper");
+
+  if(state.node === "reflection"){
+    renderVars([]);
+    paper.innerHTML = `
+      <div class="stage-tag">Etapa 8 · Reflexão Histórica</div>
+      <div class="final-title">Perguntas de Reflexão Histórica</div>
+      <div class="reflection">
+        ${REFLECTION_Q.map((q,i)=>`<label>${i+1}. ${q}</label><textarea id="ans${i}" oninput="state.answers[${i}]=this.value">${esc(state.answers[i])}</textarea>`).join("")}
+      </div>
+      <div class="actions">
+        <button class="btn" onclick="printAnswers()">🖨️ Imprimir / Salvar Respostas em PDF</button>
+        <button class="btn secondary" onclick="restart()">Recomeçar o Jogo</button>
+      </div>`;
+    document.getElementById("progress").textContent = "";
+    return;
+  }
+
+  const n = NODES[state.node];
+  renderVars(n.vars);
+  let inner = "";
+  if(n.final){
+    inner += `<div class="stage-tag">${n.stage}</div><div class="year-tag">${n.year}</div>
+      ${state.char?`<div class="char-badge">${state.char}</div>`:""}
+      <div class="final-title">${n.title}</div>
+      <div class="story-text">${n.text}</div>
+      <div class="actions">
+        <button class="btn" onclick="choose('reflection')">Responder às Perguntas de Reflexão →</button>
+        <button class="btn secondary" onclick="restart()">Recomeçar o Jogo</button>
+      </div>`;
+  } else if(n.isCharPick){
+    inner += `<div class="stage-tag">${n.stage}</div><div class="year-tag">${n.year}</div>
+      <div class="story-text">${n.text}</div>
+      <div class="charpick">
+        ${n.choices.map((c,i)=>`<div class="char-card" onclick="choose('${c.to}',NODES.n1.choices[${i}].char)"><h3>${c.label}</h3><p>${c.desc}</p></div>`).join("")}
+      </div>`;
+  } else {
+    inner += `<div class="stage-tag">${n.stage}</div><div class="year-tag">${n.year}</div>
+      ${state.char?`<div class="char-badge">${state.char}</div>`:""}
+      <div class="story-text">${n.text}</div>
+      <div class="choices">
+        ${n.choices.map((c,i)=>`<button class="choice-btn" onclick="choose('${c.to}')"><b>${i===0?"A.":"B."}</b> ${c.label}</button>`).join("")}
+      </div>`;
+  }
+  paper.innerHTML = inner;
+  document.getElementById("progress").textContent = `${n.stage}`;
+}
+
+function restart(){
+  state = {node:"n1", char:null, final:null, answers:["","",""]};
+  render();
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+
+function printAnswers(){
+  const w = window.open("", "_blank");
+  if(!w) return;
+  const finalNode = NODES[state.final] || {};
+  const d = w.document;
+  d.title = "Reflexão Histórica — Império em Jogo";
+  const st = d.createElement("style");
+  st.textContent = "body{font-family:Georgia,serif;max-width:700px;margin:40px auto;line-height:1.6;color:#2b2013;} h1{font-size:22px;} h2{font-size:16px;margin-top:28px;} p{white-space:pre-line;}";
+  d.head.appendChild(st);
+  const add = (tag, text) => {
+    const e = d.createElement(tag);
+    e.textContent = text;
+    d.body.appendChild(e);
+  };
+  add("h1", "Império em Jogo — Reflexão Histórica");
+  add("p", "Personagem: " + (state.char || "—") + "\nDesfecho: " + (finalNode.title || "—"));
+  REFLECTION_Q.forEach((q, i) => {
+    add("h2", (i + 1) + ". " + q);
+    add("p", state.answers[i] || "(sem resposta)");
+  });
+  w.focus();
+  setTimeout(() => w.print(), 300);
+}
+
+render();
+</script>
+</body>
+</html>
